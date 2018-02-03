@@ -1,0 +1,7 @@
+app:
+  build: .
+  restart: always
+  volumes:
+    - ./workspace:/workspace
+  environment:
+    - VIRTUAL_HOST=c9.lvh.me

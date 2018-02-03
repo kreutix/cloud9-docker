@@ -27,6 +27,20 @@ RUN sed -i -e 's_127.0.0.1_0.0.0.0_g' /cloud9/configs/standalone.js
 # Add supervisord conf
 ADD conf/cloud9.conf /etc/supervisor/conf.d/
 
+# Install Codeintel
+RUN apt-get install -y python-pip python-dev \
+	&& pip install -U pip \
+	&& pip install -U virtualenv \
+	&& virtualenv --python=python2 $HOME/.c9/python2 \
+	&& . $HOME/.c9/python2/bin/activate \
+	&& mkdir /tmp/codeintel \
+	&& pip download -d /tmp/codeintel codeintel==0.9.3 \
+	&& cd /tmp/codeintel \
+	&& tar xf CodeIntel-0.9.3.tar.gz \
+	&& mv CodeIntel-0.9.3/SilverCity CodeIntel-0.9.3/silvercity \
+	&& tar czf CodeIntel-0.9.3.tar.gz CodeIntel-0.9.3 \
+	&& pip install -U --no-index --find-links=/tmp/codeintel codeintel 
+
 # ------------------------------------------------------------------------------
 # Add volumes
 RUN mkdir /workspace
