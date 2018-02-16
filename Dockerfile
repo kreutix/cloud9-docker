@@ -1,19 +1,43 @@
 # ------------------------------------------------------------------------------
-# Based on a work at https://github.com/docker/docker.
+# Based on a work at https://github.com/kdelfour/cloud9-docker..
 # ------------------------------------------------------------------------------
+
 # Pull base image.
-FROM kdelfour/supervisor-docker
-MAINTAINER Kevin Delfour <kevin@delfour.eu>
+FROM ubuntu:14.04
+
+MAINTAINER Stefan Kreuter <kreuter@gigatec.de>
+
+# Install Supervisor.
+RUN apt-get update && apt-get install -y supervisor && sed -i 's/^\(\[supervisord\]\)$/\1\nnodaemon=true/' /etc/supervisor/supervisord.conf
+
+# Define mountable directories.
+VOLUME ["/etc/supervisor/conf.d"]
+
+# ------------------------------------------------------------------------------
+# Security changes
+# - Determine runlevel and services at startup [BOOT-5180]
+RUN update-rc.d supervisor defaults
+
+# - Check the output of apt-cache policy manually to determine why output is empty [KRNL-5788]
+#RUN apt-get update | apt-get upgrade -y
+
+# - Install a PAM module for password strength testing like pam_cracklib or pam_passwdqc [AUTH-9262]
+RUN apt-get update && apt-get install libpam-cracklib -y && ln -s /lib/x86_64-linux-gnu/security/pam_cracklib.so /lib/security
+
+# Define working directory.
+WORKDIR /etc/supervisor/conf.d
+
+# ------------------------------------------------------------------------------
+# Start supervisor, define default command.
+CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
 
 # ------------------------------------------------------------------------------
 # Install base
-RUN apt-get update
-RUN apt-get install -y build-essential g++ curl libssl-dev apache2-utils git libxml2-dev sshfs
+RUN apt-get update && apt-get install -y build-essential g++ curl libssl-dev apache2-utils git libxml2-dev sshfs
 
 # ------------------------------------------------------------------------------
 # Install Node.js
-RUN curl -sL https://deb.nodesource.com/setup | bash -
-RUN apt-get install -y nodejs
+RUN curl -sL https://deb.nodesource.com/setup | bash - && apt-get update && apt-get install -y nodejs
     
 # ------------------------------------------------------------------------------
 # Install Cloud9
@@ -28,7 +52,7 @@ RUN sed -i -e 's_127.0.0.1_0.0.0.0_g' /cloud9/configs/standalone.js
 ADD conf/cloud9.conf /etc/supervisor/conf.d/
 
 # Install Codeintel
-RUN apt-get install -y python-pip python-dev \
+RUN apt-get update && apt-get install -y python-pip python-dev \
 	&& pip install -U pip \
 	&& pip install -U virtualenv \
 	&& virtualenv --python=python2 $HOME/.c9/python2 \
@@ -40,15 +64,17 @@ RUN apt-get install -y python-pip python-dev \
 	&& mv CodeIntel-0.9.3/SilverCity CodeIntel-0.9.3/silvercity \
 	&& tar czf CodeIntel-0.9.3.tar.gz CodeIntel-0.9.3 \
 	&& pip install -U --no-index --find-links=/tmp/codeintel codeintel 
+	
+RUN apt-get update \
+    && apt-get install -y php5-dev php5-mysql php5-xdebug sudo mysql-server \
+    && mkdir -p /etc/php5/mods-available \
+    && echo "xdebug.remote_enable=1" >> /etc/php5/mods-available/xdebug.ini \
+    && php5enmod xdebug
 
 # ------------------------------------------------------------------------------
 # Add volumes
 RUN mkdir /workspace
 VOLUME /workspace
-
-# ------------------------------------------------------------------------------
-# Clean up APT when done.
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # ------------------------------------------------------------------------------
 # Expose ports.
@@ -57,4 +83,10 @@ EXPOSE 3000
 
 # ------------------------------------------------------------------------------
 # Start supervisor, define default command.
-CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+#CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+
+RUN mv /root /home/dev && chmod -R 777 /home/dev && ln -s /home/dev /root
+
+COPY ./entrypoint.sh /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
