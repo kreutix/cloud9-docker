@@ -14,6 +14,10 @@ RUN apt-get install -y build-essential g++ curl libssl-dev apache2-utils git lib
 # Install Node.js
 RUN curl -sL https://deb.nodesource.com/setup_5.x | bash -
 RUN apt-get install -y nodejs
+
+# ------------------------------------------------------------------------------
+# Force Dockerfile Rebuild (set cloud9-docker.version)
+RUN echo 0.2 > /cloud9-docker.version
     
 # ------------------------------------------------------------------------------
 # Install Cloud9
